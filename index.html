@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Odd-Meter Reading Trainer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100dvh;
+            overflow: hidden;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        h1 {
+            font-size: 1.1rem;
+            margin: 2px 0;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+        .subtitle {
+            font-size: 0.7rem;
+            color: #888;
+        }
+        .controls-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            width: 94vw;
+            max-width: 400px;
+            justify-content: space-between;
+        }
+        .mode-selector {
+            display: flex;
+            background: #1e1e1e;
+            padding: 3px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            flex: 1;
+        }
+        .mode-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #888;
+            padding: 5px 2px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .mode-btn.active {
+            background: #d97706;
+            color: #fff;
+        }
+        .bpm-control {
+            display: flex;
+            align-items: center;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 2px 6px;
+            gap: 6px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .bpm-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .stats-panel {
+            display: flex;
+            justify-content: space-around;
+            width: 94vw;
+            max-width: 400px;
+            background: #1e1e1e;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            font-size: 0.8rem;
+            margin-bottom: 8px;
+        }
+        .stat-val {
+            font-weight: bold;
+            color: #2a9d8f;
+        }
+        /* メイン譜面カード */
+        .score-card {
+            width: 94vw;
+            max-width: 400px;
+            background: #1b1b1e;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 12px 10px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        .score-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 0 4px;
+        }
+        .time-sig {
+            font-size: 1.3rem;
+            font-weight: 900;
+            color: #ffb703;
+            font-family: Georgia, serif;
+        }
+        .grouping-badge {
+            background: #2b2b30;
+            color: #ccc;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .bar-status {
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #2a9d8f;
+        }
+        /* 音符グリッド */
+        .notes-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 4px;
+            height: 92px;
+            padding: 4px 2px;
+            position: relative;
+        }
+        .beat-col {
+            flex: 1;
+            height: 100%;
+            background: #252529;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 2px;
+            position: relative;
+            border: 2px solid transparent;
+            transition: transform 0.05s;
+        }
+        .beat-col.group-start {
+            border-left: 2px solid #555;
+        }
+        .beat-col.accent {
+            background: #2d261e;
+        }
+        .beat-col.active {
+            border-color: #38bdf8;
+            background: #1e3a4c;
+            transform: translateY(-2px);
+        }
+        .beat-col.active.accent {
+            border-color: #ffb703;
+            background: #4a3512;
+        }
+        .beat-col.hit-perfect {
+            background: #1b4332 !important;
+            border-color: #2a9d8f !important;
+        }
+        .beat-col.hit-miss {
+            background: #4a1c24 !important;
+            border-color: #e63946 !important;
+        }
+        .accent-mark {
+            font-size: 1rem;
+            font-weight: 900;
+            color: #ffb703;
+            height: 16px;
+            line-height: 16px;
+        }
+        .note-visual {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .note-stem {
+            width: 2.5px;
+            height: 24px;
+            background: #888;
+        }
+        .beat-col.accent .note-stem {
+            background: #fff;
+        }
+        .note-head {
+            width: 12px;
+            height: 9px;
+            border-radius: 50%;
+            background: #888;
+            transform: rotate(-20deg);
+            margin-top: -1px;
+        }
+        .beat-col.accent .note-head {
+            background: #ffb703;
+        }
+        .beat-num {
+            font-size: 0.7rem;
+            color: #777;
+            font-weight: bold;
+        }
+        .beat-col.accent .beat-num {
+            color: #ffb703;
+        }
+
+        /* 次小節プレビュー */
+        .next-preview {
+            width: 94vw;
+            max-width: 400px;
+            background: #161618;
+            border: 1px dashed #333;
+            border-radius: 8px;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .next-label {
+            font-size: 0.7rem;
+            color: #888;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .next-blocks {
+            display: flex;
+            gap: 3px;
+            flex: 1;
+            justify-content: flex-end;
+        }
+        .mini-block {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            background: #26262a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            color: #666;
+        }
+        .mini-block.accent {
+            background: #b45309;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* 判定フィードバック */
+        #judgement {
+            height: 24px;
+            font-size: 1rem;
+            font-weight: 900;
+            text-align: center;
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+        .j-perfect { color: #2a9d8f; }
+        .j-great { color: #38bdf8; }
+        .j-miss { color: #e63946; }
+        .j-count { color: #ffb703; }
+
+        /* 巨大タップエリア */
+        #tap-pad {
+            flex: 1;
+            width: 94vw;
+            max-width: 400px;
+            background: linear-gradient(180deg, #222629 0%, #181a1c 100%);
+            border: 2px solid #333;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        #tap-pad:active, #tap-pad.pressed {
+            background: #2a3238;
+            border-color: #ffb703;
+            transform: scale(0.99);
+        }
+        .pad-main-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #fff;
+            pointer-events: none;
+        }
+        .pad-sub-text {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 4px;
+            pointer-events: none;
+        }
+        .bottom-bar {
+            display: flex;
+            width: 94vw;
+            max-width: 400px;
+            gap: 8px;
+        }
+        .ctrl-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+            background: #2a9d8f;
+            color: #fff;
+        }
+        .ctrl-btn.stop {
+            background: #e63946;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>変拍子アクセント・リーディング</h1>
+        <div class="subtitle">「>」の位置に合わせてタップ（完全無音）</div>
+    </header>
+
+    <div class="controls-row">
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('5', this)">5/8</button>
+            <button class="mode-btn" onclick="setMode('7', this)">7/8</button>
+            <button class="mode-btn" onclick="setMode('9', this)">9/8</button>
+            <button class="mode-btn" onclick="setMode('MIX', this)">MIX</button>
+        </div>
+        <div class="bpm-control">
+            <span>♩=</span>
+            <button class="bpm-btn" onclick="changeBpm(-5)">-</button>
+            <span id="bpm-val">100</span>
+            <button class="bpm-btn" onclick="changeBpm(5)">+</button>
+        </div>
+    </div>
+
+    <div class="stats-panel">
+        <div>COMBO: <span id="combo" class="stat-val">0</span></div>
+        <div>精度: <span id="accuracy" class="stat-val">--%</span></div>
+        <div>BEST COMBO: <span id="best-combo" class="stat-val">0</span></div>
+    </div>
+
+    <div class="score-card">
+        <div class="score-header">
+            <div id="time-sig" class="time-sig">5/8</div>
+            <div id="grouping-badge" class="grouping-badge">3 + 2</div>
+            <div id="bar-status" class="bar-status">待機中</div>
+        </div>
+        <div id="notes-container" class="notes-container"></div>
+    </div>
+
+    <div class="next-preview">
+        <div id="next-label" class="next-label">NEXT (5/8):</div>
+        <div id="next-blocks" class="next-blocks"></div>
+    </div>
+
+    <div id="judgement" class="j-count">STARTを押して開始</div>
+
+    <div id="tap-pad">
+        <div class="pad-main-text">ACCENT TAP</div>
+        <div class="pad-sub-text">「>」のタイミングでここをタップ</div>
+    </div>
+
+    <div class="bottom-bar">
+        <button id="start-btn" class="ctrl-btn" onclick="togglePlay()">START</button>
+    </div>
+
+    <script>
+        let currentMode = '5';
+        let bpm = 100; // 4分音符基準（8分音符1個 = 60 / (bpm * 2) 秒）
+        let isPlaying = false;
+        let timerId = null;
+
+        let currentPattern = null;
+        let nextPattern = null;
+
+        let isCountIn = true;
+        let stepIndex = 0;
+        let lastStepTime = 0;
+        let stepDurationMs = 300;
+
+        let combo = 0;
+        let bestCombo = parseInt(localStorage.getItem('odd_meter_best') || '0');
+        let totalAccents = 0;
+        let hitAccents = 0;
+        let stepJudged = [];
+
+        const presets = {
+            '5': [
+                { meter: '5/8', groups: [3, 2] },
+                { meter: '5/8', groups: [2, 3] }
+            ],
+            '7': [
+                { meter: '7/8', groups: [2, 2, 3] },
+                { meter: '7/8', groups: [3, 2, 2] },
+                { meter: '7/8', groups: [2, 3, 2] }
+            ],
+            '9': [
+                { meter: '9/8', groups: [2, 2, 2, 3] },
+                { meter: '9/8', groups: [3, 2, 2, 2] },
+                { meter: '9/8', groups: [2, 3, 2, 2] },
+                { meter: '9/8', groups: [3, 3, 3] }
+            ]
+        };
+
+        document.getElementById('best-combo').textContent = bestCombo;
+
+        function generatePattern() {
+            let modeKey = currentMode;
+            if (modeKey === 'MIX') {
+                const keys = ['5', '7', '9'];
+                modeKey = keys[Math.floor(Math.random() * keys.length)];
+            }
+            const list = presets[modeKey];
+            const choice = list[Math.floor(Math.random() * list.length)];
+            
+            let beats = [];
+            let groupStarts = [];
+            let idx = 0;
+            for (let g of choice.groups) {
+                groupStarts.push(idx);
+                for (let i = 0; i < g; i++) {
+                    // グループの頭は必ずアクセント
+                    beats.push(i === 0 ? 1 : 0);
+                    idx++;
+                }
+            }
+
+            // 30%の確率でシンコペーション（グループ内の裏拍アクセント）を1つ追加
+            if (Math.random() < 0.3) {
+                let candidates = [];
+                for (let i = 1; i < beats.length; i++) {
+                    if (beats[i] === 0 && beats[i - 1] === 0) {
+                        candidates.push(i);
+                    }
+                }
+                if (candidates.length > 0) {
+                    let extra = candidates[Math.floor(Math.random() * candidates.length)];
+                    beats[extra] = 1;
+                }
+            }
+
+            return {
+                meter: choice.meter,
+                groups: choice.groups,
+                beats: beats,
+                groupStarts: groupStarts
+            };
+        }
+
+        function setMode(mode, btn) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (!isPlaying) {
+                currentPattern = generatePattern();
+                nextPattern = generatePattern();
+                renderScore();
+            }
+        }
+
+        function changeBpm(delta) {
+            bpm = Math.min(160, Math.max(60, bpm + delta));
+            document.getElementById('bpm-val').textContent = bpm;
+            stepDurationMs = (60 / bpm / 2) * 1000;
+        }
+
+        function renderScore() {
+            document.getElementById('time-sig').textContent = currentPattern.meter;
+            document.getElementById('grouping-badge').textContent = currentPattern.groups.join(' + ');
+
+            const container = document.getElementById('notes-container');
+            container.innerHTML = '';
+
+            currentPattern.beats.forEach((isAccent, i) => {
+                const col = document.createElement('div');
+                col.className = 'beat-col';
+                col.id = `beat-${i}`;
+                if (isAccent) col.classList.add('accent');
+                if (currentPattern.groupStarts.includes(i) && i !== 0) {
+                    col.classList.add('group-start');
+                }
+
+                const acc = document.createElement('div');
+                acc.className = 'accent-mark';
+                acc.textContent = isAccent ? '>' : '';
+
+                const visual = document.createElement('div');
+                visual.className = 'note-visual';
+                const stem = document.createElement('div');
+                stem.className = 'note-stem';
+                const head = document.createElement('div');
+                head.className = 'note-head';
+                visual.appendChild(stem);
+                visual.appendChild(head);
+
+                const num = document.createElement('div');
+                num.className = 'beat-num';
+                num.textContent = i + 1;
+
+                col.appendChild(acc);
+                col.appendChild(visual);
+                col.appendChild(num);
+                container.appendChild(col);
+            });
+
+            // 次小節プレビュー
+            document.getElementById('next-label').textContent = `NEXT (${nextPattern.meter} / ${nextPattern.groups.join('+')}):`;
+            const nextContainer = document.getElementById('next-blocks');
+            nextContainer.innerHTML = '';
+            nextPattern.beats.forEach((isAccent, i) => {
+                const b = document.createElement('div');
+                b.className = 'mini-block' + (isAccent ? ' accent' : '');
+                b.textContent = isAccent ? '>' : (i + 1);
+                nextContainer.appendChild(b);
+            });
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                stopGame();
+            } else {
+                startGame();
+            }
+        }
+
+        function startGame() {
+            isPlaying = true;
+            const btn = document.getElementById('start-btn');
+            btn.textContent = 'STOP';
+            btn.classList.add('stop');
+
+            combo = 0;
+            totalAccents = 0;
+            hitAccents = 0;
+            updateStats();
+
+            currentPattern = generatePattern();
+            nextPattern = generatePattern();
+            renderScore();
+
+            isCountIn = true;
+            stepIndex = 0;
+            stepDurationMs = (60 / bpm / 2) * 1000;
+
+            tick();
+            timerId = setInterval(tick, stepDurationMs);
+        }
+
+        function stopGame() {
+            isPlaying = false;
+            clearInterval(timerId);
+            const btn = document.getElementById('start-btn');
+            btn.textContent = 'START';
+            btn.classList.remove('stop');
+            document.getElementById('bar-status').textContent = '停止中';
+            setJudgement('STARTを押して開始', 'j-count');
+            document.querySelectorAll('.beat-col').forEach(c => c.classList.remove('active'));
+        }
+
+        function tick() {
+            // 前のステップの未タップ（見逃し）判定
+            if (!isCountIn && stepIndex > 0) {
+                checkMissedStep(stepIndex - 1);
+            } else if (!isCountIn && stepIndex === 0 && stepJudged.length > 0) {
+                checkMissedStep(stepJudged.length - 1);
+            }
+
+            // 小節の終端に達したら次のパターンへ切り替え
+            if (stepIndex >= currentPattern.beats.length) {
+                if (isCountIn) {
+                    isCountIn = false;
+                } else {
+                    currentPattern = nextPattern;
+                    nextPattern = generatePattern();
+                    renderScore();
+                }
+                stepIndex = 0;
+                stepJudged = Array(currentPattern.beats.length).fill(false);
+
+                // BPM変更が反映されるようインターバル再設定
+                clearInterval(timerId);
+                stepDurationMs = (60 / bpm / 2) * 1000;
+                timerId = setInterval(tick, stepDurationMs);
+            }
+
+            if (stepIndex === 0 && !isCountIn) {
+                stepJudged = Array(currentPattern.beats.length).fill(false);
+            }
+
+            lastStepTime = performance.now();
+
+            // ハイライト更新
+            document.querySelectorAll('.beat-col').forEach(c => c.classList.remove('active'));
+            const activeCol = document.getElementById(`beat-${stepIndex}`);
+            if (activeCol) activeCol.classList.add('active');
+
+            if (isCountIn) {
+                document.getElementById('bar-status').textContent = 'COUNT IN (準備)';
+                setJudgement(`準備: ${stepIndex + 1} / ${currentPattern.beats.length}`, 'j-count');
+            } else {
+                document.getElementById('bar-status').textContent = 'PLAYING';
+                if (currentPattern.beats[stepIndex] === 1) {
+                    totalAccents++;
+                    updateStats();
+                }
+            }
+
+            stepIndex++;
+        }
+
+        function checkMissedStep(idx) {
+            if (currentPattern.beats[idx] === 1 && !stepJudged[idx]) {
+                combo = 0;
+                updateStats();
+                const col = document.getElementById(`beat-${idx}`);
+                if (col) col.classList.add('hit-miss');
+                setJudgement('MISS (見逃し)', 'j-miss');
+            }
+        }
+
+        function handleTap() {
+            const pad = document.getElementById('tap-pad');
+            pad.classList.add('pressed');
+            setTimeout(() => pad.classList.remove('pressed'), 80);
+
+            if (!isPlaying || isCountIn) return;
+
+            const now = performance.now();
+            // 現在アクティブなステップ（stepIndex - 1）または直後のステップへの近さを計算
+            let currentIdx = stepIndex - 1;
+            if (currentIdx < 0) currentIdx = 0;
+
+            const elapsed = now - lastStepTime;
+            let targetIdx = currentIdx;
+
+            // 次の拍の直前（フライング気味）にタップした場合は次の拍として判定
+            if (elapsed > stepDurationMs * 0.55 && currentIdx + 1 < currentPattern.beats.length) {
+                targetIdx = currentIdx + 1;
+            }
+
+            if (stepJudged[targetIdx]) return;
+
+            if (currentPattern.beats[targetIdx] === 1) {
+                stepJudged[targetIdx] = true;
+                hitAccents++;
+                combo++;
+                if (combo > bestCombo) {
+                    bestCombo = combo;
+                    localStorage.setItem('odd_meter_best', bestCombo);
+                }
+                updateStats();
+                const col = document.getElementById(`beat-${targetIdx}`);
+                if (col) col.classList.add('hit-perfect');
+
+                const diff = targetIdx === currentIdx ? elapsed : (stepDurationMs - elapsed);
+                if (diff < stepDurationMs * 0.25) {
+                    setJudgement('PERFECT!', 'j-perfect');
+                } else {
+                    setJudgement('GREAT!', 'j-great');
+                }
+            } else {
+                // アクセントではない拍をタップした場合（お手つき）
+                stepJudged[targetIdx] = true;
+                combo = 0;
+                updateStats();
+                const col = document.getElementById(`beat-${targetIdx}`);
+                if (col) col.classList.add('hit-miss');
+                setJudgement('MISS (裏拍お手つき)', 'j-miss');
+            }
+        }
+
+        function setJudgement(text, cls) {
+            const el = document.getElementById('judgement');
+            el.textContent = text;
+            el.className = cls;
+        }
+
+        function updateStats() {
+            document.getElementById('combo').textContent = combo;
+            document.getElementById('best-combo').textContent = bestCombo;
+            if (totalAccents > 0) {
+                const acc = Math.round((hitAccents / totalAccents) * 100);
+                document.getElementById('accuracy').textContent = `${acc}%`;
+            } else {
+                document.getElementById('accuracy').textContent = '--%';
+            }
+        }
+
+        // タッチ遅延ゼロのイベント登録
+        const padEl = document.getElementById('tap-pad');
+        padEl.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            handleTap();
+        });
+
+        // 初期描画
+        currentPattern = generatePattern();
+        nextPattern = generatePattern();
+        renderScore();
+    </script>
+</body>
+</html>
