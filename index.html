@@ -91,40 +91,47 @@
         }
         .stats-panel {
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 4px;
             width: 94vw;
             max-width: 400px;
             background: #1e1e1e;
             padding: 6px 10px;
             border-radius: 8px;
             border: 1px solid #333;
-            font-size: 0.8rem;
-            margin-bottom: 8px;
+            font-size: 0.75rem;
+            margin-bottom: 6px;
         }
         .stat-val {
             font-weight: bold;
             color: #2a9d8f;
         }
-        /* メイン譜面カード */
+        .stat-val.timer {
+            color: #ffb703;
+        }
+        .stat-val.today {
+            color: #38bdf8;
+        }
         .score-card {
             width: 94vw;
             max-width: 400px;
             background: #1b1b1e;
             border: 1px solid #333;
             border-radius: 10px;
-            padding: 12px 10px;
-            margin-bottom: 8px;
+            padding: 10px;
+            margin-bottom: 6px;
             position: relative;
         }
         .score-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             padding: 0 4px;
         }
         .time-sig {
-            font-size: 1.3rem;
+            font-size: 1.25rem;
             font-weight: 900;
             color: #ffb703;
             font-family: Georgia, serif;
@@ -141,15 +148,14 @@
         .bar-status {
             font-size: 0.75rem;
             font-weight: bold;
-            color: #2a9d8f;
+            color: #38bdf8;
         }
-        /* 音符グリッド */
         .notes-container {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
             gap: 4px;
-            height: 92px;
+            height: 86px;
             padding: 4px 2px;
             position: relative;
         }
@@ -162,7 +168,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 6px 2px;
+            padding: 5px 2px;
             position: relative;
             border: 2px solid transparent;
             transition: transform 0.05s;
@@ -204,7 +210,7 @@
         }
         .note-stem {
             width: 2.5px;
-            height: 24px;
+            height: 22px;
             background: #888;
         }
         .beat-col.accent .note-stem {
@@ -229,8 +235,6 @@
         .beat-col.accent .beat-num {
             color: #ffb703;
         }
-
-        /* 次小節プレビュー */
         .next-preview {
             width: 94vw;
             max-width: 400px;
@@ -238,7 +242,7 @@
             border: 1px dashed #333;
             border-radius: 8px;
             padding: 6px 10px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -272,22 +276,18 @@
             color: #fff;
             font-weight: bold;
         }
-
-        /* 判定フィードバック */
         #judgement {
-            height: 24px;
-            font-size: 1rem;
+            height: 22px;
+            font-size: 0.95rem;
             font-weight: 900;
             text-align: center;
             margin-bottom: 6px;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
         .j-perfect { color: #2a9d8f; }
         .j-great { color: #38bdf8; }
         .j-miss { color: #e63946; }
         .j-count { color: #ffb703; }
-
-        /* 巨大タップエリア */
         #tap-pad {
             flex: 1;
             width: 94vw;
@@ -347,7 +347,7 @@
 
     <header>
         <h1>変拍子アクセント・リーディング</h1>
-        <div class="subtitle">「>」の位置に合わせてタップ（完全無音）</div>
+        <div class="subtitle">3分トライアル・4小節カウントイン（完全無音）</div>
     </header>
 
     <div class="controls-row">
@@ -366,9 +366,10 @@
     </div>
 
     <div class="stats-panel">
+        <div>残り: <span id="timer-val" class="stat-val timer">03:00</span></div>
         <div>COMBO: <span id="combo" class="stat-val">0</span></div>
         <div>精度: <span id="accuracy" class="stat-val">--%</span></div>
-        <div>BEST COMBO: <span id="best-combo" class="stat-val">0</span></div>
+        <div>今日ベスト: <span id="today-best" class="stat-val today">0 / --%</span></div>
     </div>
 
     <div class="score-card">
@@ -385,11 +386,11 @@
         <div id="next-blocks" class="next-blocks"></div>
     </div>
 
-    <div id="judgement" class="j-count">STARTを押して開始</div>
+    <div id="judgement" class="j-count">STARTを押して開始（3分間）</div>
 
     <div id="tap-pad">
         <div class="pad-main-text">ACCENT TAP</div>
-        <div class="pad-sub-text">「>」のタイミングでここをタップ</div>
+        <div class="pad-sub-text">4小節カウント後、「>」のタイミングでタップ</div>
     </div>
 
     <div class="bottom-bar">
@@ -397,21 +398,27 @@
     </div>
 
     <script>
+        const TRIAL_SECONDS = 180; // 3分間
+        const COUNT_IN_BARS = 4; // 初めの4小節はカウントのみ
+
         let currentMode = '5';
-        let bpm = 100; // 4分音符基準（8分音符1個 = 60 / (bpm * 2) 秒）
+        let bpm = 100;
         let isPlaying = false;
         let timerId = null;
+        let countdownId = null;
 
+        let remainingSeconds = TRIAL_SECONDS;
         let currentPattern = null;
         let nextPattern = null;
 
+        let countInBar = 1; // 1〜4
         let isCountIn = true;
         let stepIndex = 0;
         let lastStepTime = 0;
         let stepDurationMs = 300;
 
         let combo = 0;
-        let bestCombo = parseInt(localStorage.getItem('odd_meter_best') || '0');
+        let maxComboInRun = 0;
         let totalAccents = 0;
         let hitAccents = 0;
         let stepJudged = [];
@@ -434,7 +441,55 @@
             ]
         };
 
-        document.getElementById('best-combo').textContent = bestCombo;
+        function getTodayKeyPrefix() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `odd_meter_today_${y}-${m}-${d}`;
+        }
+
+        function loadTodayBest() {
+            const raw = localStorage.getItem(getTodayKeyPrefix());
+            if (!raw) {
+                return { bestCombo: 0, bestAcc: null };
+            }
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return { bestCombo: 0, bestAcc: null };
+            }
+        }
+
+        function updateTodayBestIfNeeded(runCombo, runAcc) {
+            const current = loadTodayBest();
+            let updated = false;
+            if (runCombo > current.bestCombo) {
+                current.bestCombo = runCombo;
+                updated = true;
+            }
+            if (runAcc !== null && (current.bestAcc === null || runAcc > current.bestAcc)) {
+                current.bestAcc = runAcc;
+                updated = true;
+            }
+            if (updated) {
+                localStorage.setItem(getTodayKeyPrefix(), JSON.stringify(current));
+            }
+            renderTodayBest();
+        }
+
+        function renderTodayBest() {
+            const best = loadTodayBest();
+            const accText = best.bestAcc !== null ? `${best.bestAcc}%` : '--%';
+            document.getElementById('today-best').textContent = `${best.bestCombo} / ${accText}`;
+        }
+
+        function formatTime(sec) {
+            const clamped = Math.max(0, sec);
+            const m = String(Math.floor(clamped / 60)).padStart(2, '0');
+            const s = String(clamped % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
 
         function generatePattern() {
             let modeKey = currentMode;
@@ -451,13 +506,11 @@
             for (let g of choice.groups) {
                 groupStarts.push(idx);
                 for (let i = 0; i < g; i++) {
-                    // グループの頭は必ずアクセント
                     beats.push(i === 0 ? 1 : 0);
                     idx++;
                 }
             }
 
-            // 30%の確率でシンコペーション（グループ内の裏拍アクセント）を1つ追加
             if (Math.random() < 0.3) {
                 let candidates = [];
                 for (let i = 1; i < beats.length; i++) {
@@ -535,7 +588,6 @@
                 container.appendChild(col);
             });
 
-            // 次小節プレビュー
             document.getElementById('next-label').textContent = `NEXT (${nextPattern.meter} / ${nextPattern.groups.join('+')}):`;
             const nextContainer = document.getElementById('next-blocks');
             nextContainer.innerHTML = '';
@@ -549,7 +601,7 @@
 
         function togglePlay() {
             if (isPlaying) {
-                stopGame();
+                stopGame(false);
             } else {
                 startGame();
             }
@@ -561,7 +613,11 @@
             btn.textContent = 'STOP';
             btn.classList.add('stop');
 
+            remainingSeconds = TRIAL_SECONDS;
+            document.getElementById('timer-val').textContent = formatTime(remainingSeconds);
+
             combo = 0;
+            maxComboInRun = 0;
             totalAccents = 0;
             hitAccents = 0;
             updateStats();
@@ -571,36 +627,62 @@
             renderScore();
 
             isCountIn = true;
+            countInBar = 1;
             stepIndex = 0;
             stepDurationMs = (60 / bpm / 2) * 1000;
 
             tick();
             timerId = setInterval(tick, stepDurationMs);
+
+            countdownId = setInterval(() => {
+                if (!isPlaying) return;
+                remainingSeconds--;
+                document.getElementById('timer-val').textContent = formatTime(remainingSeconds);
+                if (remainingSeconds <= 0) {
+                    finishTrial();
+                }
+            }, 1000);
         }
 
-        function stopGame() {
+        function finishTrial() {
+            stopGame(true);
+            const acc = totalAccents > 0 ? Math.round((hitAccents / totalAccents) * 100) : null;
+            updateTodayBestIfNeeded(maxComboInRun, acc);
+            const accLabel = acc !== null ? `${acc}%` : '--%';
+            setJudgement(`3分終了！ 精度:${accLabel} / 最大COMBO:${maxComboInRun}`, 'j-perfect');
+        }
+
+        function stopGame(isFinished) {
             isPlaying = false;
             clearInterval(timerId);
+            clearInterval(countdownId);
             const btn = document.getElementById('start-btn');
             btn.textContent = 'START';
             btn.classList.remove('stop');
             document.getElementById('bar-status').textContent = '停止中';
-            setJudgement('STARTを押して開始', 'j-count');
+            if (!isFinished) {
+                document.getElementById('timer-val').textContent = formatTime(TRIAL_SECONDS);
+                setJudgement('STARTを押して開始（3分間）', 'j-count');
+            }
             document.querySelectorAll('.beat-col').forEach(c => c.classList.remove('active'));
         }
 
         function tick() {
-            // 前のステップの未タップ（見逃し）判定
+            if (!isPlaying) return;
+
             if (!isCountIn && stepIndex > 0) {
                 checkMissedStep(stepIndex - 1);
             } else if (!isCountIn && stepIndex === 0 && stepJudged.length > 0) {
                 checkMissedStep(stepJudged.length - 1);
             }
 
-            // 小節の終端に達したら次のパターンへ切り替え
             if (stepIndex >= currentPattern.beats.length) {
                 if (isCountIn) {
-                    isCountIn = false;
+                    if (countInBar < COUNT_IN_BARS) {
+                        countInBar++;
+                    } else {
+                        isCountIn = false;
+                    }
                 } else {
                     currentPattern = nextPattern;
                     nextPattern = generatePattern();
@@ -609,7 +691,6 @@
                 stepIndex = 0;
                 stepJudged = Array(currentPattern.beats.length).fill(false);
 
-                // BPM変更が反映されるようインターバル再設定
                 clearInterval(timerId);
                 stepDurationMs = (60 / bpm / 2) * 1000;
                 timerId = setInterval(tick, stepDurationMs);
@@ -621,14 +702,13 @@
 
             lastStepTime = performance.now();
 
-            // ハイライト更新
             document.querySelectorAll('.beat-col').forEach(c => c.classList.remove('active'));
             const activeCol = document.getElementById(`beat-${stepIndex}`);
             if (activeCol) activeCol.classList.add('active');
 
             if (isCountIn) {
-                document.getElementById('bar-status').textContent = 'COUNT IN (準備)';
-                setJudgement(`準備: ${stepIndex + 1} / ${currentPattern.beats.length}`, 'j-count');
+                document.getElementById('bar-status').textContent = `COUNT ${countInBar}/${COUNT_IN_BARS}`;
+                setJudgement(`カウント中（${countInBar}/${COUNT_IN_BARS}小節）: ${stepIndex + 1}`, 'j-count');
             } else {
                 document.getElementById('bar-status').textContent = 'PLAYING';
                 if (currentPattern.beats[stepIndex] === 1) {
@@ -658,14 +738,12 @@
             if (!isPlaying || isCountIn) return;
 
             const now = performance.now();
-            // 現在アクティブなステップ（stepIndex - 1）または直後のステップへの近さを計算
             let currentIdx = stepIndex - 1;
             if (currentIdx < 0) currentIdx = 0;
 
             const elapsed = now - lastStepTime;
             let targetIdx = currentIdx;
 
-            // 次の拍の直前（フライング気味）にタップした場合は次の拍として判定
             if (elapsed > stepDurationMs * 0.55 && currentIdx + 1 < currentPattern.beats.length) {
                 targetIdx = currentIdx + 1;
             }
@@ -676,11 +754,13 @@
                 stepJudged[targetIdx] = true;
                 hitAccents++;
                 combo++;
-                if (combo > bestCombo) {
-                    bestCombo = combo;
-                    localStorage.setItem('odd_meter_best', bestCombo);
+                if (combo > maxComboInRun) {
+                    maxComboInRun = combo;
                 }
+                const acc = totalAccents > 0 ? Math.round((hitAccents / totalAccents) * 100) : null;
+                updateTodayBestIfNeeded(maxComboInRun, acc);
                 updateStats();
+
                 const col = document.getElementById(`beat-${targetIdx}`);
                 if (col) col.classList.add('hit-perfect');
 
@@ -691,7 +771,6 @@
                     setJudgement('GREAT!', 'j-great');
                 }
             } else {
-                // アクセントではない拍をタップした場合（お手つき）
                 stepJudged[targetIdx] = true;
                 combo = 0;
                 updateStats();
@@ -709,7 +788,6 @@
 
         function updateStats() {
             document.getElementById('combo').textContent = combo;
-            document.getElementById('best-combo').textContent = bestCombo;
             if (totalAccents > 0) {
                 const acc = Math.round((hitAccents / totalAccents) * 100);
                 document.getElementById('accuracy').textContent = `${acc}%`;
@@ -718,14 +796,13 @@
             }
         }
 
-        // タッチ遅延ゼロのイベント登録
         const padEl = document.getElementById('tap-pad');
         padEl.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             handleTap();
         });
 
-        // 初期描画
+        renderTodayBest();
         currentPattern = generatePattern();
         nextPattern = generatePattern();
         renderScore();
