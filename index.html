@@ -179,6 +179,10 @@
         .beat-col.accent {
             background: #2d261e;
         }
+        .beat-col.rest-beat {
+            background: #1a1a1d;
+            opacity: 0.75;
+        }
         .beat-col.active {
             border-color: #38bdf8;
             background: #1e3a4c;
@@ -191,10 +195,12 @@
         .beat-col.hit-perfect {
             background: #1b4332 !important;
             border-color: #2a9d8f !important;
+            opacity: 1;
         }
         .beat-col.hit-miss {
             background: #4a1c24 !important;
             border-color: #e63946 !important;
+            opacity: 1;
         }
         .accent-mark {
             font-size: 1rem;
@@ -226,6 +232,12 @@
         }
         .beat-col.accent .note-head {
             background: #ffb703;
+        }
+        .rest-mark {
+            font-size: 1.05rem;
+            font-weight: bold;
+            color: #71717a;
+            line-height: 31px;
         }
         .beat-num {
             font-size: 0.7rem;
@@ -271,6 +283,11 @@
             font-size: 0.6rem;
             color: #666;
         }
+        .mini-block.rest-mini {
+            background: #18181b;
+            color: #52525b;
+            border: 1px dashed #3f3f46;
+        }
         .mini-block.accent {
             background: #b45309;
             color: #fff;
@@ -278,7 +295,7 @@
         }
         #judgement {
             height: 22px;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 900;
             text-align: center;
             margin-bottom: 6px;
@@ -347,7 +364,7 @@
 
     <header>
         <h1>変拍子アクセント・リーディング</h1>
-        <div class="subtitle">3分トライアル・4小節カウントイン（完全無音）</div>
+        <div class="subtitle">2分トライアル・2小節カウントイン（完全無音）</div>
     </header>
 
     <div class="controls-row">
@@ -366,7 +383,7 @@
     </div>
 
     <div class="stats-panel">
-        <div>残り: <span id="timer-val" class="stat-val timer">03:00</span></div>
+        <div>残り: <span id="timer-val" class="stat-val timer">02:00</span></div>
         <div>COMBO: <span id="combo" class="stat-val">0</span></div>
         <div>精度: <span id="accuracy" class="stat-val">--%</span></div>
         <div>今日ベスト: <span id="today-best" class="stat-val today">0 / --%</span></div>
@@ -386,11 +403,11 @@
         <div id="next-blocks" class="next-blocks"></div>
     </div>
 
-    <div id="judgement" class="j-count">STARTを押して開始（3分間）</div>
+    <div id="judgement" class="j-count">STARTを押して開始（2分間）</div>
 
     <div id="tap-pad">
         <div class="pad-main-text">ACCENT TAP</div>
-        <div class="pad-sub-text">4小節カウント後、「>」のタイミングでタップ</div>
+        <div class="pad-sub-text">2小節カウント後、「>」のタイミングでタップ（休符はスルー）</div>
     </div>
 
     <div class="bottom-bar">
@@ -398,8 +415,8 @@
     </div>
 
     <script>
-        const TRIAL_SECONDS = 180; // 3分間
-        const COUNT_IN_BARS = 4; // 初めの4小節はカウントのみ
+        const TRIAL_SECONDS = 120; // 2分間
+        const COUNT_IN_BARS = 2; // 初めの2小節はカウントのみ
 
         let currentMode = '5';
         let bpm = 100;
@@ -411,7 +428,7 @@
         let currentPattern = null;
         let nextPattern = null;
 
-        let countInBar = 1; // 1〜4
+        let countInBar = 1; // 1〜2
         let isCountIn = true;
         let stepIndex = 0;
         let lastStepTime = 0;
@@ -491,6 +508,7 @@
             return `${m}:${s}`;
         }
 
+        // 各ステップの状態: 0 = 通常音符, 1 = アクセント音符(>), -1 = 休符(𝄾)
         function generatePattern() {
             let modeKey = currentMode;
             if (modeKey === 'MIX') {
@@ -511,10 +529,17 @@
                 }
             }
 
+            // 約35%の確率で1拍目を休符にする（高難易度パターン）
+            const firstBeatRest = Math.random() < 0.35;
+            if (firstBeatRest) {
+                beats[0] = -1;
+            }
+
+            // グループ頭以外の通常音符にアクセントを追加（休符は除外）
             if (Math.random() < 0.3) {
                 let candidates = [];
                 for (let i = 1; i < beats.length; i++) {
-                    if (beats[i] === 0 && beats[i - 1] === 0) {
+                    if (beats[i] === 0 && beats[i - 1] !== 1) {
                         candidates.push(i);
                     }
                 }
@@ -528,7 +553,8 @@
                 meter: choice.meter,
                 groups: choice.groups,
                 beats: beats,
-                groupStarts: groupStarts
+                groupStarts: groupStarts,
+                firstBeatRest: firstBeatRest
             };
         }
 
@@ -550,17 +576,22 @@
         }
 
         function renderScore() {
+            const restTag = currentPattern.firstBeatRest ? ' [1拍目休符]' : '';
             document.getElementById('time-sig').textContent = currentPattern.meter;
-            document.getElementById('grouping-badge').textContent = currentPattern.groups.join(' + ');
+            document.getElementById('grouping-badge').textContent = `${currentPattern.groups.join(' + ')}${restTag}`;
 
             const container = document.getElementById('notes-container');
             container.innerHTML = '';
 
-            currentPattern.beats.forEach((isAccent, i) => {
+            currentPattern.beats.forEach((beatVal, i) => {
+                const isAccent = beatVal === 1;
+                const isRest = beatVal === -1;
+
                 const col = document.createElement('div');
                 col.className = 'beat-col';
                 col.id = `beat-${i}`;
                 if (isAccent) col.classList.add('accent');
+                if (isRest) col.classList.add('rest-beat');
                 if (currentPattern.groupStarts.includes(i) && i !== 0) {
                     col.classList.add('group-start');
                 }
@@ -571,12 +602,20 @@
 
                 const visual = document.createElement('div');
                 visual.className = 'note-visual';
-                const stem = document.createElement('div');
-                stem.className = 'note-stem';
-                const head = document.createElement('div');
-                head.className = 'note-head';
-                visual.appendChild(stem);
-                visual.appendChild(head);
+
+                if (isRest) {
+                    const restEl = document.createElement('div');
+                    restEl.className = 'rest-mark';
+                    restEl.textContent = '𝄾';
+                    visual.appendChild(restEl);
+                } else {
+                    const stem = document.createElement('div');
+                    stem.className = 'note-stem';
+                    const head = document.createElement('div');
+                    head.className = 'note-head';
+                    visual.appendChild(stem);
+                    visual.appendChild(head);
+                }
 
                 const num = document.createElement('div');
                 num.className = 'beat-num';
@@ -588,13 +627,22 @@
                 container.appendChild(col);
             });
 
-            document.getElementById('next-label').textContent = `NEXT (${nextPattern.meter} / ${nextPattern.groups.join('+')}):`;
+            const nextRestTag = nextPattern.firstBeatRest ? ' 休1' : '';
+            document.getElementById('next-label').textContent = `NEXT (${nextPattern.meter} / ${nextPattern.groups.join('+')}${nextRestTag}):`;
             const nextContainer = document.getElementById('next-blocks');
             nextContainer.innerHTML = '';
-            nextPattern.beats.forEach((isAccent, i) => {
+            nextPattern.beats.forEach((beatVal, i) => {
                 const b = document.createElement('div');
-                b.className = 'mini-block' + (isAccent ? ' accent' : '');
-                b.textContent = isAccent ? '>' : (i + 1);
+                if (beatVal === -1) {
+                    b.className = 'mini-block rest-mini';
+                    b.textContent = '休';
+                } else if (beatVal === 1) {
+                    b.className = 'mini-block accent';
+                    b.textContent = '>';
+                } else {
+                    b.className = 'mini-block';
+                    b.textContent = i + 1;
+                }
                 nextContainer.appendChild(b);
             });
         }
@@ -649,7 +697,7 @@
             const acc = totalAccents > 0 ? Math.round((hitAccents / totalAccents) * 100) : null;
             updateTodayBestIfNeeded(maxComboInRun, acc);
             const accLabel = acc !== null ? `${acc}%` : '--%';
-            setJudgement(`3分終了！ 精度:${accLabel} / 最大COMBO:${maxComboInRun}`, 'j-perfect');
+            setJudgement(`2分終了！ 精度:${accLabel} / 最大COMBO:${maxComboInRun}`, 'j-perfect');
         }
 
         function stopGame(isFinished) {
@@ -662,7 +710,7 @@
             document.getElementById('bar-status').textContent = '停止中';
             if (!isFinished) {
                 document.getElementById('timer-val').textContent = formatTime(TRIAL_SECONDS);
-                setJudgement('STARTを押して開始（3分間）', 'j-count');
+                setJudgement('STARTを押して開始（2分間）', 'j-count');
             }
             document.querySelectorAll('.beat-col').forEach(c => c.classList.remove('active'));
         }
@@ -750,7 +798,9 @@
 
             if (stepJudged[targetIdx]) return;
 
-            if (currentPattern.beats[targetIdx] === 1) {
+            const beatState = currentPattern.beats[targetIdx];
+
+            if (beatState === 1) {
                 stepJudged[targetIdx] = true;
                 hitAccents++;
                 combo++;
@@ -771,12 +821,14 @@
                     setJudgement('GREAT!', 'j-great');
                 }
             } else {
+                // 休符（-1）や通常音符（0）を叩いた場合はお手つき
                 stepJudged[targetIdx] = true;
                 combo = 0;
                 updateStats();
                 const col = document.getElementById(`beat-${targetIdx}`);
                 if (col) col.classList.add('hit-miss');
-                setJudgement('MISS (裏拍お手つき)', 'j-miss');
+                const reason = beatState === -1 ? 'MISS (休符をお手つき)' : 'MISS (裏拍お手つき)';
+                setJudgement(reason, 'j-miss');
             }
         }
 
